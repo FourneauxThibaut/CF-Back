@@ -1,6 +1,6 @@
 # CF-Back
 
-API backend **Go** avec **Fiber**, **SQLC** et **Supabase** (base PostgreSQL + Auth).
+API backend **Go** avec **Gin**, **SQLC** et **Supabase** (base PostgreSQL + Auth).
 
 ## Prérequis
 
@@ -45,14 +45,14 @@ go mod tidy
 sqlc generate
 
 # Lancer l’API
-go run ./cmd/server
+go run .
 ```
 
 L’API écoute sur `http://localhost:3000` (ou la valeur de `PORT`).
 
 ## Structure
 
-- **`cmd/server`** : point d’entrée (main)
+- **`main.go`**, **`router/`**, **`handlers/`** : point d’entrée (bootstrap, router, handlers)
 - **`internal/config`** : chargement de la config (env)
 - **`internal/db`** : connexion DB, schéma SQLC, migrations, requêtes SQL
 - **`internal/auth`** : middleware Supabase (vérification du JWT via `GET /auth/v1/user`)
@@ -69,6 +69,7 @@ Exemples de routes :
 
 - `GET /health` : public
 - `GET /api/me` : protégé, renvoie l’utilisateur courant
+- `GET /api/profile` : protégé, profil utilisateur (SQLC)
 
 ## SQLC
 

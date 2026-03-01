@@ -2,108 +2,102 @@ package auth
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gin-gonic/gin"
 )
 
-// User représente les infos utilisateur retournées par Supabase Auth
+// User represents the user info returned by Supabase Auth.
 type User struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`
-	// Ajouter d'autres champs selon besoin (phone, user_metadata, etc.)
 }
 
-// SupabaseUserResponse structure de la réponse GET /auth/v1/user
+// SupabaseUserResponse is the response shape of GET /auth/v1/user.
 type SupabaseUserResponse struct {
-	ID    string                 `json:"id"`
-	Email string                 `json:"email"`
-	UserMetadata map[string]any  `json:"user_metadata,omitempty"`
+	ID           string            `json:"id"`
+	Email        string            `json:"email"`
+	UserMetadata map[string]any    `json:"user_metadata,omitempty"`
 }
 
-// ValidateSupabaseToken vérifie le JWT auprès de Supabase Auth (recommandé par Supabase)
-func ValidateSupabaseToken(supabaseURL, anonKey string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		// Let CORS preflight through without auth (browser sends OPTIONS without Authorization)
-		if c.Method() == fiber.MethodOptions {
-			return c.Next()
+const (
+	userContextKey  = "user"
+	userIDContextKey = "userID"
+)
+
+// ValidateSupabaseToken returns a Gin middleware that verifies the JWT with Supabase Auth.
+func ValidateSupabaseToken(supabaseURL, anonKey string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
 		}
-		authHeader := c.Get("Authorization")
+		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Authorization header required",
-			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.Abort()
+			return
 		}
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid Authorization header format",
-			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
+			c.Abort()
+			return
 		}
 		token := parts[1]
 
-		req, err := http.NewRequestWithContext(c.Context(), http.MethodGet, strings.TrimSuffix(supabaseURL, "/")+"/auth/v1/user", nil)
+		req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, strings.TrimSuffix(supabaseURL, "/")+"/auth/v1/user", nil)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create auth request",
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create auth request"})
+			c.Abort()
+			return
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("apikey", anonKey)
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-				"error": "Auth service unavailable",
-			})
+			c.JSON(http.StatusBadGateway, gin.H{"error": "Auth service unavailable"})
+			c.Abort()
+			return
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid or expired token",
-				"detail": string(body),
-			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token", "detail": string(body)})
+			c.Abort()
+			return
 		}
 
 		var userResp SupabaseUserResponse
 		if err := json.NewDecoder(resp.Body).Decode(&userResp); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to parse user",
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user"})
+			c.Abort()
+			return
 		}
 
-		// Stocker l'utilisateur dans le contexte Fiber pour les handlers
-		c.Locals("user", User{
-			ID:    userResp.ID,
-			Email: userResp.Email,
-		})
-		c.Locals("userID", userResp.ID)
-		return c.Next()
+		c.Set(userContextKey, User{ID: userResp.ID, Email: userResp.Email})
+		c.Set(userIDContextKey, userResp.ID)
+		c.Next()
 	}
 }
 
-// GetUser extrait l'utilisateur du contexte (à appeler après le middleware)
-func GetUser(c *fiber.Ctx) (User, bool) {
-	u, ok := c.Locals("user").(User)
-	return u, ok
-}
-
-// GetUserID retourne l'ID utilisateur ou une chaîne vide
-func GetUserID(c *fiber.Ctx) string {
-	id, _ := c.Locals("userID").(string)
-	return id
-}
-
-// RequireUser retourne une erreur 401 si pas d'utilisateur
-func RequireUser(c *fiber.Ctx) (User, error) {
-	u, ok := GetUser(c)
+// GetUser returns the user from the request context (set by ValidateSupabaseToken).
+func GetUser(c *gin.Context) (User, bool) {
+	u, ok := c.Get(userContextKey)
 	if !ok {
-		return User{}, fmt.Errorf("user not in context")
+		return User{}, false
 	}
-	return u, nil
+	user, ok := u.(User)
+	return user, ok
+}
+
+// GetUserID returns the current user's ID or an empty string.
+func GetUserID(c *gin.Context) string {
+	id, _ := c.Get(userIDContextKey)
+	s, _ := id.(string)
+	return s
 }
