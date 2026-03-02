@@ -77,14 +77,17 @@ func New(cfg *config.Config, queries *sqlcgen.Queries, ruleHandler *handlers.Rul
 	return r
 }
 
-func getCORSOrigins(env string) []string {
-	if env == "" {
+// getCORSOrigins parses FRONTEND_URL (from cfg.FrontendURL). Comma-separated for multiple origins.
+func getCORSOrigins(frontendURL string) []string {
+	if frontendURL == "" {
 		return []string{"http://localhost:5173", "http://127.0.0.1:5173"}
 	}
-	parts := strings.Split(env, ",")
+	parts := strings.Split(frontendURL, ",")
 	origins := make([]string, 0, len(parts))
 	for _, p := range parts {
-		if o := strings.TrimSpace(p); o != "" {
+		o := strings.TrimSpace(p)
+		o = strings.TrimSuffix(o, "/") // browser Origin has no trailing slash
+		if o != "" {
 			origins = append(origins, o)
 		}
 	}
