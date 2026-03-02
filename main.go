@@ -1,5 +1,5 @@
 package main
-// test
+
 import (
 	"context"
 	"log"
@@ -28,7 +28,9 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 	if cfg.DatabaseURL == "" || cfg.SupabaseURL == "" || cfg.SupabaseAnonKey == "" {
-		log.Fatal("Missing required env: DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY")
+		log.Fatal(`Missing required env: DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY.
+Set them in Scalingo: Dashboard > Your App > Environment, or:
+  scalingo --app <app-name> env-set DATABASE_URL="..." SUPABASE_URL="..." SUPABASE_ANON_KEY="..."`)
 	}
 
 	ctx := context.Background()

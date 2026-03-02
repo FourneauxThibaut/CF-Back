@@ -7,10 +7,9 @@
 /server
 /cmd/server/server
 
-# Environment
+# Environment (keep .env.example for reference)
 .env
 .env.local
-*.env
 
 # IDE
 .idea/

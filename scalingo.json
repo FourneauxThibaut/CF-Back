@@ -1,0 +1,22 @@
+{
+  "name": "Cherry Fire API",
+  "description": "Go API backend with Gin, SQLC and Supabase (PostgreSQL + Auth)",
+  "env": {
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (Supabase: Project Settings > Database > Connection string URI)",
+      "required": true
+    },
+    "SUPABASE_URL": {
+      "description": "Supabase project URL (e.g. https://xxxx.supabase.co)",
+      "required": true
+    },
+    "SUPABASE_ANON_KEY": {
+      "description": "Supabase anon public key (Project Settings > API)",
+      "required": true
+    },
+    "FRONTEND_URL": {
+      "description": "Frontend URL for CORS (e.g. https://your-app.osc-fr1.scalingo.com)",
+      "value": ""
+    }
+  }
+}

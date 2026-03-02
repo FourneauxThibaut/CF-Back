@@ -1,79 +1,47 @@
 # CF-Back
 
-API backend **Go** avec **Gin**, **SQLC** et **Supabase** (base PostgreSQL + Auth).
+API Go (Gin + SQLC + Supabase). PostgreSQL pour la DB, Supabase pour l’auth.
 
-## Prérequis
+## Setup
 
-- [Go 1.22+](https://go.dev/dl/)
-- [SQLC](https://docs.sqlc.dev/en/latest/overview/install.html) (CLI pour générer le code SQL)
-- Un projet [Supabase](https://supabase.com) (base + Auth)
-
-### Installer SQLC (Windows)
+Go 1.22+, [SQLC](https://docs.sqlc.dev/en/latest/overview/install.html). Sur Windows : `go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest` puis ajouter le bin au PATH.
 
 ```powershell
-# Avec Go
-go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-# Puis ajouter $env:GOPATH\bin (ou $env:LOCALAPPDATA\Go\bin) au PATH
+copy .env.example .env
+# Éditer .env avec SUPABASE_URL, SUPABASE_ANON_KEY, DATABASE_URL
 ```
 
-Ou télécharger le binaire depuis [GitHub Releases](https://github.com/sqlc-dev/sqlc/releases).
-
-## Configuration
-
-1. Copier les variables d’environnement :
-
-   ```powershell
-   copy .env.example .env
-   ```
-
-2. Renseigner dans `.env` :
-   - **SUPABASE_URL** : URL du projet (ex. `https://xxxx.supabase.co`)
-   - **SUPABASE_ANON_KEY** : clé « anon public » (Supabase Dashboard > Project Settings > API)
-   - **DATABASE_URL** : chaîne de connexion PostgreSQL (Dashboard > Project Settings > Database > Connection string > URI)
-
-3. Appliquer les migrations sur la base Supabase :
-   - Fichiers dans `internal/db/migrations/`
-   - À exécuter dans l’éditeur SQL du Dashboard Supabase (ou via `supabase db push` si vous utilisez le CLI Supabase)
-
-## Commandes
+Migrations dans `internal/db/migrations/` — à exécuter dans le SQL Editor Supabase (ou `supabase db push`).
 
 ```powershell
-# Télécharger les dépendances
 go mod tidy
-
-# Générer le code SQLC (requêtes type-safe)
 sqlc generate
-
-# Lancer l’API
 go run .
 ```
 
-L’API écoute sur `http://localhost:3000` (ou la valeur de `PORT`).
+Écoute sur `:3000` (ou `PORT`).
+
+## Auth
+
+Routes `/api/*` protégées par JWT Supabase. Header : `Authorization: Bearer <token>`. Le middleware appelle `GET /auth/v1/user` et expose l’user via `auth.GetUser(c)`.
+
+- `GET /health` — public
+- `GET /api/me`, `GET /api/profile` — protégés
+
+## Scalingo
+
+Même variables que le dev : `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`. Les définir dans Dashboard > Environment. Pour CORS, ajouter `FRONTEND_URL` si le front est sur un autre domaine.
+
+```bash
+scalingo --app cherry-fire env-set DATABASE_URL="..." SUPABASE_URL="..." SUPABASE_ANON_KEY="..."
+```
+
+Utiliser l’URI pooler (port 6543) pour la connexion DB — plus adapté au serverless.
 
 ## Structure
 
-- **`main.go`**, **`router/`**, **`handlers/`** : point d’entrée (bootstrap, router, handlers)
-- **`internal/config`** : chargement de la config (env)
-- **`internal/db`** : connexion DB, schéma SQLC, migrations, requêtes SQL
-- **`internal/auth`** : middleware Supabase (vérification du JWT via `GET /auth/v1/user`)
-
-## Auth Supabase
-
-Les routes sous `/api/*` exigent un JWT Supabase valide :
-
-- Header : `Authorization: Bearer <access_token>`
-- Le token est vérifié en appelant Supabase `GET /auth/v1/user` (recommandé par Supabase)
-- L’utilisateur est ensuite disponible dans le contexte (ex. `auth.GetUser(c)`)
-
-Exemples de routes :
-
-- `GET /health` : public
-- `GET /api/me` : protégé, renvoie l’utilisateur courant
-- `GET /api/profile` : protégé, profil utilisateur (SQLC)
-
-## SQLC
-
-- **Schéma** : `internal/db/schema/` (tables utilisées par SQLC)
-- **Migrations** : `internal/db/migrations/` (à exécuter sur Supabase)
-- **Requêtes** : `internal/db/queries/*.sql`
-- **Code généré** : `internal/db/sqlc/` (à régénérer avec `sqlc generate` après toute modification du schéma ou des requêtes)
+- `main.go`, `router/`, `handlers/` — bootstrap et routes
+- `internal/config` — config depuis env
+- `internal/db` — pool pgx, schéma SQLC, migrations
+- `internal/auth` — middleware JWT Supabase
+- `internal/db/sqlc/` — code généré, à régénérer avec `sqlc generate` après modif du schéma ou des queries
