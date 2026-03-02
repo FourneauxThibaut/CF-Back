@@ -13,7 +13,7 @@ import (
 )
 
 // New builds the Gin engine with all routes and middleware.
-func New(cfg *config.Config, queries *sqlcgen.Queries, ruleHandler *handlers.RuleSystemHandler) *gin.Engine {
+func New(cfg *config.Config, queries *sqlcgen.Queries, ruleHandler *handlers.RuleSystemHandler, authProxy *handlers.AuthProxy) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
@@ -36,6 +36,12 @@ func New(cfg *config.Config, queries *sqlcgen.Queries, ruleHandler *handlers.Rul
 
 	// Public routes
 	r.GET("/health", handlers.Health)
+
+	// Auth proxy (login, signup, logout, refresh) — credentials stay server-side
+	r.POST("/auth/login", authProxy.Login)
+	r.POST("/auth/signup", authProxy.Signup)
+	r.POST("/auth/logout", authProxy.Logout)
+	r.POST("/auth/refresh", authProxy.Refresh)
 
 	// Protected API group (Supabase Auth required)
 	// Note: gin-contrib/cors handles OPTIONS preflight automatically

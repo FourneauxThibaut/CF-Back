@@ -44,7 +44,8 @@ Set them in Scalingo: Dashboard > Your App > Environment, or:
 	ruleRepo := ruleeditor.NewJSONBRepository(pool)
 	ruleSvc := ruleeditor.NewService(ruleRepo)
 	ruleHandler := handlers.NewRuleSystemHandler(ruleSvc)
-	engine := router.New(cfg, queries, ruleHandler)
+	authProxy := handlers.NewAuthProxy(cfg)
+	engine := router.New(cfg, queries, ruleHandler, authProxy)
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{Addr: addr, Handler: engine}
